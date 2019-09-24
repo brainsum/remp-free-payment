@@ -7,7 +7,19 @@ This module adds a free payment gateway and an instant subscription Sales funnel
 Installation
 --
 
-Install module via composer:
+Install module via composer by adding the repositories to your composer.json file
+
+```
+    ...
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/brainsum/remp-free-payment"
+        }
+    ...
+```
+
+Then require it via composer:
 
 ```
 composer require brainsum/remp-free-payment
