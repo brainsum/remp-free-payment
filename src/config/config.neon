@@ -1,0 +1,9 @@
+services:
+	- Crm\FreePaymentModule\Gateways\Free
+	- Crm\FreePaymentModule\Seeders\FreePaymentGatewaySeeder
+	gatewayFactory:
+		setup:
+			- registerGateway(free, Crm\FreePaymentModule\Gateways\Free)
+	moduleManager:
+		setup:
+			- addModule(Crm\FreePaymentModule\FreePaymentModule())

@@ -1,0 +1,22 @@
+{
+  "name": "brainsum/remp-free-payment",
+  "description": "REMP Free payment gateway",
+  "type": "library",
+  "homepage": "https://brainsum.com",
+  "license": "MIT",
+  "require": {
+    "php": "^7.2",
+    "ext-soap": "*",
+    "php-http/curl-client": "^1.7",
+    "remp/crm-application-module": "~0.2 >=0.2.7",
+    "remp/crm-subscriptions-module": "~0.2 >=0.2.7",
+    "remp/crm-salesfunnel-module": "~0.2 >=0.2.7"
+  },
+  "minimum-stability": "dev",
+  "autoload": {
+    "psr-4": {
+      "Crm\\FreePaymentModule\\": "src/"
+    },
+    "classmap": ["src/"]
+  }
+}
