@@ -570,6 +570,8 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
                 $this->emitter->emit(new SalesFunnelEvent($funnel, $this->getUser(), SalesFunnelsStatsRepository::TYPE_ERROR, $ua));
                 $this->redirect('error');
             }
+
+            $this->getUser()->login(['username' => $user->email, 'alwaysLogin' => true]);
             $this->usersRepository->update($user, [
                 'sales_funnel_id' => $funnel->id,
             ]);

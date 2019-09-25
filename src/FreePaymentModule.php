@@ -36,6 +36,14 @@ class FreePaymentModule extends CrmModule
         $this->paymentsHistogramFactory = $paymentsHistogramFactory;
     }
 
+    public function registerEventHandlers(\League\Event\Emitter $emitter)
+    {
+        $emitter->addListener(
+            \Crm\UsersModule\Events\UserCreatedEvent::class,
+            $this->getInstance(\Crm\FreePaymentModule\Events\UserCreatedEventHandler::class)
+        );
+    }
+
     public function registerSeeders(SeederManager $seederManager)
     {
         $seederManager->addSeeder($this->getInstance(FreePaymentGatewaySeeder::class));
