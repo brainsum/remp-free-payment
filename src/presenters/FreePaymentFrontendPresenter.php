@@ -6,25 +6,21 @@ use Crm\SalesFunnelModule\Presenters\SalesFunnelFrontendPresenter;
 use Crm\ApplicationModule\Hermes\HermesMessage;
 use Crm\ApplicationModule\Presenters\FrontendPresenter;
 use Crm\ApplicationModule\Request;
-use Crm\PaymentsModule\CannotProcessPayment;
 use Crm\PaymentsModule\GatewayFactory;
-use Crm\PaymentsModule\Gateways\RecurrentPaymentInterface;
-use Crm\PaymentsModule\PaymentItem\DonationPaymentItem;
-use Crm\PaymentsModule\PaymentItem\PaymentItemContainer;
 use Crm\PaymentsModule\PaymentProcessor;
 use Crm\PaymentsModule\Repository\PaymentGatewaysRepository;
 use Crm\PaymentsModule\Repository\PaymentsRepository;
 use Crm\PaymentsModule\Repository\RecurrentPaymentsRepository;
-use Crm\SalesFunnelModule\Events\PaymentItemContainerReadyEvent;
 use Crm\SalesFunnelModule\Events\SalesFunnelEvent;
 use Crm\SalesFunnelModule\Repository\SalesFunnelsMetaRepository;
 use Crm\SalesFunnelModule\Repository\SalesFunnelsRepository;
 use Crm\SalesFunnelModule\Repository\SalesFunnelsStatsRepository;
 use Crm\SegmentModule\SegmentFactory;
-use Crm\SubscriptionsModule\PaymentItem\SubscriptionTypePaymentItem;
 use Crm\SubscriptionsModule\Repository\ContentAccessRepository;
 use Crm\SubscriptionsModule\Repository\SubscriptionTypesRepository;
 use Crm\SubscriptionsModule\Subscription\ActualUserSubscription;
+use Crm\SubscriptionsModule\Repository\SubscriptionsRepository;
+use Crm\SubscriptionsModule\Events\SubscriptionStartsEvent;
 use Crm\UsersModule\Auth\Authorizator;
 use Crm\UsersModule\Auth\InvalidEmailException;
 use Crm\UsersModule\Auth\UserManager;
@@ -38,7 +34,6 @@ use Nette\Security\AuthenticationException;
 use Nette\Utils\DateTime;
 use Nette\Utils\Json;
 use Nette\Http\Url;
-use Tomaj\Form\Renderer\BootstrapRenderer;
 use Tomaj\Hermes\Emitter;
 
 class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
@@ -329,89 +324,61 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
             $this->redirect('limitReached', $funnel->id);
         }
 
-        $addressId = filter_input(INPUT_POST, 'address_id');
-        if ($addressId) {
-            $address = $this->addressesRepository->find($addressId);
-            if ($address->user_id != $user->id) {
-                $address = null;
-            }
-        }
-
-        $paymentItemContainer = (new PaymentItemContainer())->addItems(SubscriptionTypePaymentItem::fromSubscriptionType($subscriptionType));
-        if ($additionalAmount) {
-            $donationPaymentVat = $this->applicationConfig->get('donation_vat_rate');
-            if ($donationPaymentVat === null) {
-                throw new \Exception("Config 'donation_vat_rate' is not set");
-            }
-            $paymentItemContainer->addItem(new DonationPaymentItem($this->translator->translate('payments.admin.donation'), $additionalAmount, $donationPaymentVat));
-        }
-
-        // let modules add own items to PaymentItemContainer before payment is created
-        $this->emitter->emit(new PaymentItemContainerReadyEvent(
-            $paymentItemContainer,
-            $this->getHttpRequest()->getPost()
-        ));
-
-        $payment = $this->paymentsRepository->add(
-            $subscriptionType,
-            $paymentGateway,
-            $user,
-            $paymentItemContainer,
-            $referer,
-            null,
-            null,
-            null,
-            null,
-            $additionalAmount,
-            $additionalType,
-            null,
-            $address
-        );
-
-        $customNote = false;
-        if (isset($_POST['custom']) && is_array($_POST['custom']) && count($_POST['custom']) > 0) {
-            foreach ($_POST['custom'] as $key => $value) {
-                if ($value) {
-                    $customNote .= "$key: $value\n";
-                }
-            }
-        }
-        if ($customNote) {
-            $this->paymentsRepository->update($payment, ['note' => $customNote]);
-        }
-
-        $metaData = $this->getHttpRequest()->getPost('payment_metadata', []);
-
-        $this->paymentsRepository->update($payment, ['sales_funnel_id' => $funnel->id]);
-
-        // Set payment to PAID.
-        $this->paymentsRepository->updateStatus($payment, PaymentsRepository::STATUS_PAID);
+        $subscription = $this->createSubscription($subscriptionType, $user);
 
         $browserId = $_COOKIE['browser_id'] ?? null;
+        $metaData = $this->getHttpRequest()->getPost('payment_metadata', []);
+
         $metaData = array_merge($metaData, $this->trackingParams());
         $metaData['newsletters_subscribe'] = (bool) filter_input(INPUT_POST, 'newsletters_subscribe');
         if ($browserId) {
             $metaData['browser_id'] = $browserId;
         }
-        $this->paymentsRepository->addMeta($payment, $metaData);
-
-        $this->hermesEmitter->emit(new HermesMessage('sales-funnel', [
-            'type' => 'payment',
-            'user_id' => $user->id,
-            'browser_id' => $browserId,
-            'sales_funnel_id' => $funnel->id,
-            'payment_id' => $payment->id,
-        ]));
 
         if ($referer) {
             $url = new Url($referer);
             if ($destination = $url->getQueryParameter('destination')) {
-                $this->redirectUrl($destination);
+                $this->redirect(':SalesFunnel:SalesFunnelFrontend:Success', ['destination' => $destination]);
             }
         }
 
         $this->flashMessage('Successful subscription');
         $this->redirect(':Subscriptions:Subscriptions:my');
+    }
+
+    public function renderSuccess()
+    {
+        if ($_GET['destination']) {
+            $this->template->destination = $_GET['destination'];
+        }
+
+        $this->getSession('sales_funnel')->remove();
+    }
+
+    private function createSubscription($subscription_type, $user) {
+        $subscriptionType = SubscriptionsRepository::TYPE_REGULAR;
+
+        $subscription = $this->subscriptionsRepository->add(
+            $subscription_type,
+            false,
+            $user,
+            $subscriptionType,
+            null,
+            null,
+            null,
+            null
+        );
+
+        if ($subscription->end_time <= new DateTime()) {
+            $this->subscriptionsRepository->setExpired($subscription);
+        } elseif ($subscription->start_time <= new DateTime()) {
+            $this->subscriptionsRepository->update($subscription, ['internal_status' => SubscriptionsRepository::INTERNAL_STATUS_ACTIVE]);
+            $this->emitter->emit(new SubscriptionStartsEvent($subscription));
+        } else {
+            $this->subscriptionsRepository->update($subscription, ['internal_status' => SubscriptionsRepository::INTERNAL_STATUS_BEFORE_START]);
+        }
+
+        return $subscription;
     }
 
     private function loadGateways(ActiveRow $salesFunnel)
