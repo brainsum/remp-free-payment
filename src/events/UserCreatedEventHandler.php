@@ -27,23 +27,27 @@ class UserCreatedEventHandler extends AbstractListener
     {
         if ($event->sendEmail()) {
           $password = $event->getOriginalPassword();
-
           $user = $event->getUser();
 
-          $headers = [
-            'From' => 'dev+drupalremp@brainsum.com',
-            'MIME-Version' => '1.0',
-            'Content-Type' => 'text/html; charset=UTF-8',
-            'X-Mailer' => 'PHP/' . phpversion()
+          $client = new \GuzzleHttp\Client();
+          $mailer_host = getenv('MAILER_ADDR');
+          $url = $mailer_host . '/api/v1/mailers/send-email';
+          $body = [
+            "mail_template_code" => "user_created",
+            "email" => $user->email,
+            "params" => [
+              'email' => $user->email,
+              'password' => $password
+            ]
           ];
 
-          // TODO: Use template for this.
-
-          $body = "<h2>Login credentials:</h2><br/>
-          User: <strong>{$user->email}</strong><br/>
-          Password: <strong>{$password}</strong><br/>";
-
-          $res = mail($user->email, "New user has been created " , $body, $headers);
+          $res = $client->post($url, [
+            'headers' => [
+              'Content-Type' => 'application/json',
+              'Authorization: Bearer ' . $_COOKIE['n_token'],
+            ],
+            'body' => json_encode($body)
+          ]);
         }
     }
 
