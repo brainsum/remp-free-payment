@@ -31,6 +31,8 @@ class UserCreatedEventHandler extends AbstractListener
 
           $client = new \GuzzleHttp\Client();
           $mailer_host = getenv('MAILER_ADDR');
+          $sso_token = getenv('SSO_TOKEN');
+
           $url = $mailer_host . '/api/v1/mailers/send-email';
           $body = [
             "mail_template_code" => "user_created",
@@ -44,11 +46,12 @@ class UserCreatedEventHandler extends AbstractListener
           $res = $client->post($url, [
             'headers' => [
               'Content-Type' => 'application/json',
-              'Authorization: Bearer ' . $_COOKIE['n_token'],
+              'Authorization'=> 'Bearer ' . $sso_token,
             ],
             'body' => json_encode($body)
           ]);
         }
+
     }
 
 }

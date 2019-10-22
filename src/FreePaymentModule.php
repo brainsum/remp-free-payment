@@ -42,6 +42,16 @@ class FreePaymentModule extends CrmModule
             \Crm\UsersModule\Events\UserCreatedEvent::class,
             $this->getInstance(\Crm\FreePaymentModule\Events\UserCreatedEventHandler::class)
         );
+
+        $emitter->addListener(
+            \Crm\SubscriptionsModule\Events\NewSubscriptionEvent::class,
+            $this->getInstance(\Crm\FreePaymentModule\Events\SubscriptionEventHandler::class)
+        );
+
+        $emitter->addListener(
+            \Crm\SubscriptionsModule\Events\SubscriptionUpdatedEvent::class,
+            $this->getInstance(\Crm\FreePaymentModule\Events\SubscriptionEventHandler::class)
+        );
     }
 
     public function registerSeeders(SeederManager $seederManager)

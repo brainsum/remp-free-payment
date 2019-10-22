@@ -2,6 +2,7 @@ services:
 	- Crm\FreePaymentModule\Gateways\Free
 	- Crm\FreePaymentModule\Seeders\FreePaymentGatewaySeeder
 	- Crm\FreePaymentModule\Events\UserCreatedEventHandler
+	- Crm\FreePaymentModule\Events\SubscriptionEventHandler
 	gatewayFactory:
 		setup:
 			- registerGateway(free, Crm\FreePaymentModule\Gateways\Free)
