@@ -24,6 +24,7 @@ use Crm\SubscriptionsModule\Events\SubscriptionStartsEvent;
 use Crm\UsersModule\Auth\Authorizator;
 use Crm\UsersModule\Auth\InvalidEmailException;
 use Crm\UsersModule\Auth\UserManager;
+use Crm\UsersModule\Forms\SignInFormFactory;
 use Crm\UsersModule\Repository\AddressesRepository;
 use Crm\UsersModule\Repository\UsersRepository;
 use Nette\Application\BadRequestException;
@@ -70,6 +71,8 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
 
     private $contentAccessRepository;
 
+    private $signInFormFactory;
+
     public function __construct(
         SalesFunnelsRepository $salesFunnelsRepository,
         SalesFunnelsStatsRepository $salesFunnelsStatsRepository,
@@ -86,7 +89,8 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
         UserManager $userManager,
         GatewayFactory $gatewayFactory,
         RecurrentPaymentsRepository $recurrentPaymentsRepository,
-        ContentAccessRepository $contentAccessRepository
+        ContentAccessRepository $contentAccessRepository,
+        SignInFormFactory $signInFormFactory
     ) {
         parent::__construct(
             $salesFunnelsRepository,
@@ -104,7 +108,8 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
             $userManager,
             $gatewayFactory,
             $recurrentPaymentsRepository,
-            $contentAccessRepository
+            $contentAccessRepository,
+            $signInFormFactory
         );
         $this->salesFunnelsRepository = $salesFunnelsRepository;
         $this->salesFunnelsStatsRepository = $salesFunnelsStatsRepository;
@@ -122,6 +127,7 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
         $this->gatewayFactory = $gatewayFactory;
         $this->recurrentPaymentsRepository = $recurrentPaymentsRepository;
         $this->contentAccessRepository = $contentAccessRepository;
+        $this->signInFormFactory = $signInFormFactory;
     }
 
     public function startup()
@@ -326,19 +332,14 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
 
         $subscription = $this->createSubscription($subscriptionType, $user);
 
-        $browserId = $_COOKIE['browser_id'] ?? null;
-        $metaData = $this->getHttpRequest()->getPost('payment_metadata', []);
-
-        $metaData = array_merge($metaData, $this->trackingParams());
-        $metaData['newsletters_subscribe'] = (bool) filter_input(INPUT_POST, 'newsletters_subscribe');
-        if ($browserId) {
-            $metaData['browser_id'] = $browserId;
-        }
-
         if ($referer) {
             $url = new Url($referer);
             if ($destination = $url->getQueryParameter('destination')) {
-                $this->redirect(':SalesFunnel:SalesFunnelFrontend:Success', ['destination' => $destination]);
+                $this->redirect(
+                    ':SalesFunnel:SalesFunnelFrontend:Success',
+                    $funnel,
+                    $destination
+                );
             }
         }
 
@@ -346,10 +347,10 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
         $this->redirect(':Subscriptions:Subscriptions:my');
     }
 
-    public function renderSuccess()
+    public function renderSuccess($funnel, $destination = NULL)
     {
-        if ($_GET['destination']) {
-            $this->template->destination = $_GET['destination'];
+        if ($destination) {
+            $this->template->destination = $destination;
         }
 
         $this->getSession('sales_funnel')->remove();
