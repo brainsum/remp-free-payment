@@ -140,12 +140,12 @@ class FreePaymentFrontendPresenter extends SalesFunnelFrontendPresenter
         if (!$funnel) {
           $funnel = $this->getHttpRequest()->getUrl()->getQueryParameter('funnel');
         }
-
-        $this->freePayment = isset($gateways['free']);
-
+        
         if ($funnel) {
             $salesFunnel = $this->salesFunnelsRepository->findByUrlKey($funnel);
             $gateways = $this->loadGateways($salesFunnel);
+            $this->freePayment = isset($gateways['free']);
+            
             if ($this->action == 'show' && $this->freePayment) {
                 $this->redirect(
                     'free',
